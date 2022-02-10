@@ -59,7 +59,7 @@ func (q *Queue) addTask(task *Task) {
 	if len(q.activeTaskWorkers) >= q.taskWorkerLimit {
 		// Если новая задача должна запуститься перед самой ранней запущенной,
 		// то прерываем воркера с самым большим временем и запускаем новую задачу
-		if task.Time <= q.earliestTask.Time {
+		if task.Time <= q.earliestTask.Time && q.earliestTask.Time < q.latestTask.Time {
 			if q.latestTask == nil {
 				fmt.Println("WARNING nil")
 			}
@@ -68,8 +68,8 @@ func (q *Queue) addTask(task *Task) {
 
 			q.startTaskWorker(task)
 
-			// Обновляем время самой поздней и самой ранней запущенной задачи
-			q.updateLatestAndEarliestTask()
+			// // Обновляем время самой поздней и самой ранней запущенной задачи
+			// q.updateLatestAndEarliestTask()
 		} else {
 			// Иначе добавляем задачу в пассивный список
 			q.passiveTaskList = append(q.passiveTaskList, task)
@@ -79,14 +79,16 @@ func (q *Queue) addTask(task *Task) {
 			})
 		}
 	} else {
-		if q.latestTask.Time < task.Time {
-			q.latestTask = task
-		}
-		if q.earliestTask.Time > task.Time || q.earliestTask.Time == 0 {
-			q.earliestTask = task
-		}
+		// if q.latestTask.Time < task.Time {
+		// 	q.latestTask = task
+		// }
+		// if q.earliestTask.Time > task.Time || q.earliestTask.Time == 0 {
+		// 	q.earliestTask = task
+		// }
 		q.startTaskWorker(task)
 	}
+	// Обновляем время самой поздней и самой ранней запущенной задачи
+	q.updateLatestAndEarliestTask()
 }
 
 func (q *Queue) startTaskWorker(task *Task) {

@@ -52,7 +52,7 @@ func (c *Controller) scheduleTaskHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	err = c.svc.ScheduleTask(&task_service.Task{
+	err = c.svc.ScheduleTask(r.Context(), &task_service.Task{
 		Time:    task.Time,
 		QueueID: task.QueueID,
 		Action:  task.Action,

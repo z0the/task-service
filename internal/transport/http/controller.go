@@ -45,10 +45,23 @@ func (c *Controller) scheduleTaskHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var task *TaskDTO
+	task := &TaskDTO{}
 	err = json.Unmarshal(rawBody, task)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
+		errResp := &ErrorResp{
+			Error: err.Error(),
+		}
+		rawErrResp, err := json.Marshal(errResp)
+		if err != nil {
+			c.lg.Println("marshal errResp error: ", err)
+			return
+		}
+		_, err = w.Write(rawErrResp)
+		if err != nil {
+			c.lg.Println("write errResp error: ", err)
+			return
+		}
 		return
 	}
 
@@ -63,4 +76,8 @@ func (c *Controller) scheduleTaskHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+type ErrorResp struct {
+	Error string `json:"error"`
 }

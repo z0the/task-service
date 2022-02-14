@@ -4,14 +4,13 @@ import (
 	"context"
 	"log"
 	"time"
+
+	"kroog-test/config"
 )
 
-const (
-	defaultRunnerLimitPerQueue = 100
-)
-
-func NewService(lg *log.Logger) *service {
+func NewService(cfg config.Config, lg *log.Logger) *service {
 	s := &service{
+		cfg:          cfg,
 		lg:           lg,
 		taskQueueMap: make(map[string]*Queue),
 	}
@@ -22,6 +21,7 @@ func NewService(lg *log.Logger) *service {
 }
 
 type service struct {
+	cfg          config.Config
 	lg           *log.Logger
 	taskQueueMap map[string]*Queue
 }
@@ -30,7 +30,8 @@ func (s service) ScheduleTask(_ context.Context, task *Task) error {
 
 	taskQueue, ok := s.taskQueueMap[task.QueueID]
 	if !ok {
-		taskQueue = newQueue(s.lg, defaultRunnerLimitPerQueue)
+		taskQueue = newQueue(s.lg, s.cfg.WorkerLimitPerQueue)
+		s.taskQueueMap[task.QueueID] = taskQueue
 	}
 	taskQueue.AddTask(task)
 

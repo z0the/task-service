@@ -60,31 +60,19 @@ func (q *Queue) addTask(task *Task) {
 		// Если новая задача должна запуститься перед самой ранней запущенной,
 		// то прерываем воркера с самым большим временем и запускаем новую задачу
 		if task.Time <= q.earliestTask.Time && q.earliestTask.Time < q.latestTask.Time {
-			if q.latestTask == nil {
-				fmt.Println("WARNING nil")
-			}
 			// Остановка воркера
 			q.activeTaskWorkers[q.latestTask]()
 
 			q.startTaskWorker(task)
-
-			// // Обновляем время самой поздней и самой ранней запущенной задачи
-			// q.updateLatestAndEarliestTask()
 		} else {
 			// Иначе добавляем задачу в пассивный список
 			q.passiveTaskList = append(q.passiveTaskList, task)
 			// Сразу сортируем, чтобы долго не искать следующую задачу, когда активная очередь освободиться
 			sort.Slice(q.passiveTaskList, func(i, j int) bool {
-				return q.passiveTaskList[i].Time > q.passiveTaskList[j].Time
+				return q.passiveTaskList[i].Time < q.passiveTaskList[j].Time
 			})
 		}
 	} else {
-		// if q.latestTask.Time < task.Time {
-		// 	q.latestTask = task
-		// }
-		// if q.earliestTask.Time > task.Time || q.earliestTask.Time == 0 {
-		// 	q.earliestTask = task
-		// }
 		q.startTaskWorker(task)
 	}
 	// Обновляем время самой поздней и самой ранней запущенной задачи
@@ -96,16 +84,13 @@ func (q *Queue) startTaskWorker(task *Task) {
 	q.activeTaskWorkers[task] = cancel
 
 	go func() {
+		timer := time.After(time.Until(time.Unix(task.Time, 0)))
 		for {
 			select {
 			case <-ctx.Done():
 				q.workerInterruptChan <- task
 				return
-			default:
-				break
-			}
-
-			if time.Now().Unix() == task.Time {
+			case <-timer:
 				q.lg.Print(getLogString(task))
 				q.workerDoneChan <- task
 				return
@@ -136,20 +121,14 @@ func (q *Queue) runTaskDoneHandler() {
 
 			// Переносим задачи из пассивного списка в активную обработку
 			freeWorkersNum := q.taskWorkerLimit - len(q.activeTaskWorkers)
-			for i, task := range q.passiveTaskList {
+			for i, newActiveTask := range q.passiveTaskList {
 				if freeWorkersNum <= 0 {
 					break
 				}
-				q.addTask(task)
+				q.addTask(newActiveTask)
 				q.passiveTaskList = q.passiveTaskList[i+1:]
 				i--
 				freeWorkersNum--
-			}
-
-			// Если выполнилась самая последняя или самая первая задача,
-			// то обновляем соответсвующие значения
-			if task == q.latestTask || task == q.earliestTask {
-				q.updateLatestAndEarliestTask()
 			}
 
 			q.Unlock()
@@ -171,5 +150,5 @@ func (q *Queue) updateLatestAndEarliestTask() {
 }
 
 func getLogString(task *Task) string {
-	return fmt.Sprintf("Task %s is processed at time: %d\n", task.Action, task.Time)
+	return fmt.Sprintf("Task %s in queue: %s is processed with time: %d\n", task.Action, task.QueueID, task.Time)
 }

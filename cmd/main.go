@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"kroog-test/config"
 	"kroog-test/internal/task_service"
 	"kroog-test/internal/transport/http"
 )
@@ -14,11 +15,13 @@ func init() {
 }
 
 func main() {
+	cfg := config.GetConfig()
+
 	logger := log.New(os.Stdout, "", log.Ldate|log.Lshortfile)
 
 	logger.Println("test")
 
-	svc := task_service.NewService(logger)
+	svc := task_service.NewService(cfg, logger)
 
 	controller := http.NewController(logger, svc)
 

@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+const defaultRunnerLimitPerQueue = 100
+
 type taskResult struct {
 	text []string
 }
@@ -18,26 +20,19 @@ func (tr *taskResult) Write(p []byte) (n int, err error) {
 	return len(p), err
 }
 
-func TestQueueSuiteTestSuite(t *testing.T) {
-	suite.Run(t, new(QueueSuite))
+func TestQueueTestSuite(t *testing.T) {
+	suite.Run(t, new(QueueTestSuite))
 }
 
-type QueueSuite struct {
+type QueueTestSuite struct {
 	suite.Suite
-	lg *log.Logger
-	tr *taskResult
 }
 
-func (s *QueueSuite) SetupSuite() {
-	s.tr = new(taskResult)
-	s.lg = log.New(s.tr, "", 0)
-}
+func (s *QueueTestSuite) SetupSuite() {}
 
-func (s *QueueSuite) SetupTest() {
-	*s.tr = taskResult{}
-}
+func (s *QueueTestSuite) SetupTest() {}
 
-func (s *QueueSuite) TestExecuteOneTask_Success() {
+func (s *QueueTestSuite) TestExecuteOneTask_Success() {
 	tr := new(taskResult)
 	lg := log.New(tr, "", 0)
 	queue := newQueue(lg, defaultRunnerLimitPerQueue)
@@ -54,15 +49,42 @@ func (s *QueueSuite) TestExecuteOneTask_Success() {
 	// и что в логах отображается информация о задаче
 	s.Len(queue.activeTaskWorkers, 0)
 	s.Len(queue.passiveTaskList, 0)
-	s.Equal(Task{}, *queue.latestTask)
-	s.Equal(Task{}, *queue.earliestTask)
+	s.Equal(*task, *queue.latestTask)
+	s.Equal(*task, *queue.earliestTask)
 	s.Equal(getLogString(task), tr.text[0])
 }
 
-func (s *QueueSuite) TestExecute100OneTimeTask_Success() {
+func (s *QueueTestSuite) TestExecute100DifferentTimeTask_Success() {
 	tr := new(taskResult)
 	lg := log.New(tr, "", 0)
 	queue := newQueue(lg, defaultRunnerLimitPerQueue)
+	expectedTextRes := make([]string, 0, 100)
+	for i := 0; i < 100; i++ {
+		task := &Task{
+			QueueID: "1",
+			Action:  fmt.Sprintf("action #%d", i),
+			Time:    time.Now().Add(time.Second * time.Duration(i)).Unix(),
+		}
+		queue.AddTask(task)
+		expectedTextRes = append(expectedTextRes, getLogString(task))
+	}
+
+	time.Sleep(time.Second * 101)
+
+	// Проверяем, что все ресурсы утилизированны корректно
+	// и что в логах есть записи обо всех задачах
+	s.Len(queue.activeTaskWorkers, 0)
+	s.Len(queue.passiveTaskList, 0)
+	s.Len(tr.text, 100)
+	s.ElementsMatch(expectedTextRes, tr.text)
+}
+
+func (s *QueueTestSuite) TestExecute100OneTimeTask_Success() {
+	tr := new(taskResult)
+	lg := log.New(tr, "", 0)
+	queue := newQueue(lg, defaultRunnerLimitPerQueue)
+
+	expectedTextRes := make([]string, 0, 100)
 	for i := 0; i < 100; i++ {
 		task := &Task{
 			QueueID: "1",
@@ -70,6 +92,7 @@ func (s *QueueSuite) TestExecute100OneTimeTask_Success() {
 			Time:    time.Now().Unix(),
 		}
 		queue.AddTask(task)
+		expectedTextRes = append(expectedTextRes, getLogString(task))
 	}
 
 	time.Sleep(time.Second * 2)
@@ -79,12 +102,15 @@ func (s *QueueSuite) TestExecute100OneTimeTask_Success() {
 	s.Len(queue.activeTaskWorkers, 0)
 	s.Len(queue.passiveTaskList, 0)
 	s.Len(tr.text, 100)
+	s.ElementsMatch(expectedTextRes, tr.text)
 }
 
-func (s *QueueSuite) TestExecute1000OneTimeTask_Success() {
+func (s *QueueTestSuite) TestExecute1000OneTimeTask_Success() {
 	tr := new(taskResult)
 	lg := log.New(tr, "", 0)
 	queue := newQueue(lg, defaultRunnerLimitPerQueue)
+
+	expectedTextRes := make([]string, 0, 1000)
 	for i := 0; i < 1000; i++ {
 		task := &Task{
 			QueueID: "1",
@@ -92,6 +118,7 @@ func (s *QueueSuite) TestExecute1000OneTimeTask_Success() {
 			Time:    time.Now().Unix(),
 		}
 		queue.AddTask(task)
+		expectedTextRes = append(expectedTextRes, getLogString(task))
 	}
 
 	// Спим, чтобы все задачи успели отработать
@@ -103,12 +130,14 @@ func (s *QueueSuite) TestExecute1000OneTimeTask_Success() {
 	s.Len(queue.activeTaskWorkers, 0)
 	s.Len(queue.passiveTaskList, 0)
 	s.Len(tr.text, 1000)
+	s.ElementsMatch(expectedTextRes, tr.text)
 }
 
-func (s *QueueSuite) TestActiveAndPassiveTask_Success() {
+func (s *QueueTestSuite) TestActiveAndPassiveTask_Success() {
 	tr := new(taskResult)
 	lg := log.New(tr, "", 0)
 	queue := newQueue(lg, defaultRunnerLimitPerQueue)
+
 	for i := 0; i < 1000; i++ {
 		task := &Task{
 			QueueID: "1",
@@ -120,12 +149,17 @@ func (s *QueueSuite) TestActiveAndPassiveTask_Success() {
 
 	// Проверяем, что при одновременном добавлении 1000 задач
 	// количество активных и пассивных задач - корректно
-	s.Len(queue.activeTaskWorkers, 100)
-	s.Len(queue.passiveTaskList, 900)
+	s.Len(queue.activeTaskWorkers, defaultRunnerLimitPerQueue)
+	s.Len(queue.passiveTaskList, 1000-defaultRunnerLimitPerQueue)
 	s.Len(tr.text, 0)
 }
 
-func (s *QueueSuite) TestTaskTimePriority_Success() {
+func (s *QueueTestSuite) TestTaskTimePriority_Success() {
+	// Тест не имеет смысла, если ограничение на воркеров менее 2
+	if defaultRunnerLimitPerQueue < 2 {
+		return
+	}
+
 	tr := new(taskResult)
 	lg := log.New(tr, "", 0)
 	queue := newQueue(lg, defaultRunnerLimitPerQueue)
@@ -154,9 +188,9 @@ func (s *QueueSuite) TestTaskTimePriority_Success() {
 
 	// Проверяем, что предыдущая последняя задача переместилась в пассивный список
 	// А задача с более ранним временем попала в активную очередь
-	s.Len(queue.passiveTaskList, 1)
-	s.Equal(queue.passiveTaskList[0], lastTask)
-	s.Len(queue.activeTaskWorkers, 100)
+	s.Len(queue.passiveTaskList, 100-defaultRunnerLimitPerQueue+1)
+	s.Equal(lastTask, queue.passiveTaskList[len(queue.passiveTaskList)-1])
+	s.Len(queue.activeTaskWorkers, defaultRunnerLimitPerQueue)
 	_, isNewTaskSwappedWithOld := queue.activeTaskWorkers[taskWithEarlierTime]
 	s.True(isNewTaskSwappedWithOld)
 }

@@ -5,25 +5,25 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var cfg *Config
-
-func init() {
-	err := godotenv.Load(".env")
-	if err != nil {
-		panic(err)
-	}
-
-	cfg = &Config{}
-	err = env.Parse(cfg)
-	if err != nil {
-		panic(err)
-	}
-}
-
 type Config struct {
 	WorkerLimitPerQueue int `env:"WORKER_LIMIT_PER_QUEUE"`
 }
 
-func GetConfig() Config {
+func (c *Config) init(envPath string) {
+	err := godotenv.Load(envPath)
+	if err != nil {
+		panic(err)
+	}
+
+	err = env.Parse(c)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func GetConfig(envPath string) Config {
+	cfg := &Config{}
+	cfg.init(envPath)
+
 	return *cfg
 }

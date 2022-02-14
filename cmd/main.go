@@ -15,11 +15,9 @@ func init() {
 }
 
 func main() {
-	cfg := config.GetConfig()
+	cfg := config.GetConfig(".env")
 
 	logger := log.New(os.Stdout, "", log.Ldate|log.Lshortfile)
-
-	logger.Println("test")
 
 	svc := task_service.NewService(cfg, logger)
 

@@ -24,7 +24,7 @@ type ServiceTestSuite struct {
 }
 
 func (s *ServiceTestSuite) SetupSuite() {
-	cfg := config.GetConfig()
+	cfg := config.GetConfig("../../.env")
 
 	s.tr = new(taskResult)
 	lg := log.New(s.tr, "", 0)

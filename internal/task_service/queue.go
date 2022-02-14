@@ -9,13 +9,13 @@ import (
 	"time"
 )
 
-func newQueue(lg *log.Logger, taskRunnerLimit int) *Queue {
+func newQueue(lg *log.Logger, taskWorkerLimit int) *Queue {
 	q := &Queue{
 		lg:                  lg,
-		taskWorkerLimit:     taskRunnerLimit,
+		taskWorkerLimit:     taskWorkerLimit,
 		activeTaskWorkers:   make(map[*Task]context.CancelFunc),
-		workerDoneChan:      make(chan *Task, taskRunnerLimit),
-		workerInterruptChan: make(chan *Task, taskRunnerLimit),
+		workerDoneChan:      make(chan *Task, taskWorkerLimit),
+		workerInterruptChan: make(chan *Task, taskWorkerLimit),
 		passiveTaskList:     make([]*Task, 0, 0),
 		latestTask:          new(Task),
 		earliestTask:        new(Task),
